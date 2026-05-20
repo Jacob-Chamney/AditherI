@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>◈ DITHER — Image Dithering Studio</title>
+<style>
+:root {
+  --bg:     #0d0b08;
+  --surf:   #151310;
+  --surf2:  #1c1a16;
+  --bdr:    #2a2520;
+  --acc:    #c07808;
+  --acc2:   #c0780818;
+  --txt:    #bdb09a;
+  --dim:    #58504a;
+  --brt:    #ecdccc;
+  --r:      3px;
+  --fn:     'Courier New', Courier, monospace;
+}
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html,body { height: 100%; background: var(--bg); color: var(--txt); font-family: var(--fn); font-size: 12px; overflow: hidden; }
+
+/* ── Header ─────────────────────────────────────────────── */
+header {
+  height: 44px; background: var(--surf); border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0;
+}
+.logo { color: var(--acc); font-size: 16px; font-weight: bold; letter-spacing: .15em; }
+.logo-sep { color: var(--bdr); }
+.logo-sub { color: var(--dim); font-size: 11px; letter-spacing: .07em; }
+.logo-ver { margin-left: auto; color: var(--dim); font-size: 10px; }
+
+/* ── Layout ──────────────────────────────────────────────── */
+.workspace { display: flex; height: calc(100vh - 44px); overflow: hidden; }
+
+/* ── Controls panel ──────────────────────────────────────── */
+.ctl {
+  width: 260px; min-width: 260px; background: var(--surf);
+  border-right: 1px solid var(--bdr); overflow-y: auto; overflow-x: hidden;
+  padding: 14px 13px; display: flex; flex-direction: column; gap: 16px;
+}
+.ctl::-webkit-scrollbar { width: 3px; }
+.ctl::-webkit-scrollbar-track { background: transparent; }
+.ctl::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 2px; }
+
+.sec-ttl {
+  font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--dim); padding-bottom: 7px; border-bottom: 1px solid var(--bdr); margin-bottom: 8px;
+}
+
+/* Algorithm buttons */
+.algo-list { display: flex; flex-direction: column; gap: 4px; }
+
+.algo-btn {
+  display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px;
+  border: 1px solid var(--bdr); border-radius: var(--r); cursor: pointer;
+  background: transparent; text-align: left; color: var(--dim); font-family: var(--fn);
+  font-size: 12px; width: 100%; transition: border-color .1s, color .1s, background .1s;
+}
+.algo-btn:hover { border-color: #5a4030; color: var(--txt); }
+.algo-btn.on { border-color: var(--acc); color: var(--brt); background: var(--acc2); }
+
+.dot {
+  width: 6px; height: 6px; border-radius: 50%; border: 1px solid currentColor;
+  flex-shrink: 0; margin-top: 3px; transition: background .1s;
+}
+.algo-btn.on .dot { background: var(--acc); border-color: var(--acc); }
+
+.a-name { font-size: 12px; display: block; }
+.a-tag { font-size: 10px; color: var(--dim); display: block; }
+.algo-btn.on .a-tag { color: #8a5c30; }
+
+/* Sliders */
+.sl-grp { margin-bottom: 9px; }
+.sl-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.sl-lbl { color: var(--txt); }
+.sl-val { color: var(--acc); font-size: 11px; min-width: 46px; text-align: right; }
+
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 2px;
+  background: var(--bdr); border-radius: 1px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--acc); cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; background: var(--acc);
+  cursor: pointer; border: none;
+}
+
+/* Toggles */
+.tgl-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+.tgl-lbl { color: var(--txt); }
+.sw { position: relative; width: 34px; height: 18px; cursor: pointer; flex-shrink: 0; }
+.sw input { opacity: 0; width: 0; height: 0; }
+.sw-trk { position: absolute; inset: 0; background: var(--bdr); border-radius: 9px; transition: background .15s; }
+.sw input:checked + .sw-trk { background: var(--acc); }
+.sw-thb { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--dim); transition: left .15s, background .15s; }
+.sw input:checked ~ .sw-thb { left: 19px; background: #fff6e8; }
+
+/* Buttons */
+.btn-grp { display: flex; flex-direction: column; gap: 6px; }
+.btn {
+  padding: 9px 14px; border: 1px solid var(--bdr); border-radius: var(--r);
+  background: transparent; color: var(--txt); font-family: var(--fn);
+  font-size: 11px; letter-spacing: .07em; cursor: pointer; text-transform: uppercase;
+  transition: all .1s; text-align: center; width: 100%;
+}
+.btn:hover:not(:disabled) { border-color: var(--acc); color: var(--acc); }
+.btn:disabled { opacity: .25; cursor: not-allowed; }
+.btn.pri { border-color: var(--acc); color: var(--acc); }
+.btn.pri:hover:not(:disabled) { background: var(--acc); color: #080604; }
+
+/* ── Canvas area ─────────────────────────────────────────── */
+.cvs-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; min-width: 0; }
+
+.dz {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px dashed var(--bdr); margin: 20px; border-radius: 4px; cursor: pointer;
+  gap: 12px; color: var(--dim); transition: border-color .15s, background .15s;
+}
+.dz:hover, .dz.over { border-color: var(--acc); background: rgba(192,120,8,.03); }
+.dz-icon { font-size: 30px; opacity: .18; line-height: 1; }
+.dz-main { font-size: 13px; letter-spacing: .05em; }
+.dz-sub { font-size: 10px; opacity: .5; }
+
+/* Split view */
+.sv {
+  flex: 1; position: relative; margin: 20px; border: 1px solid var(--bdr);
+  border-radius: 3px; background: #000; overflow: hidden;
+  display: none; /* shown after load */
+}
+
+.si { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+#imgA { clip-path: inset(0 0 0 50%); }
+
+.sh-wrap {
+  position: absolute; top: 0; bottom: 0; left: 50%;
+  transform: translateX(-50%); width: 30px; cursor: ew-resize; z-index: 10;
+  display: flex; align-items: stretch; justify-content: center;
+}
+.sh-line { width: 1px; background: var(--acc); box-shadow: 0 0 6px rgba(192,120,8,.3); }
+.sh-knob {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%; background: var(--acc);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #080604; pointer-events: none; user-select: none;
+  box-shadow: 0 0 10px rgba(192,120,8,.4);
+}
+
+.sv-lbls {
+  position: absolute; bottom: 10px; left: 12px; right: 12px;
+  display: flex; justify-content: space-between; pointer-events: none;
+}
+.sv-tag {
+  font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(192,120,8,.65); background: rgba(0,0,0,.72); padding: 3px 8px; border-radius: 2px;
+}
+
+/* Status bar */
+.stbar {
+  height: 30px; background: var(--surf); border-top: 1px solid var(--bdr);
+  padding: 0 20px; display: flex; align-items: center; justify-content: space-between;
+  font-size: 10px; letter-spacing: .04em; flex-shrink: 0; color: var(--dim);
+}
+.st-proc { color: var(--acc); }
+
+/* Histogram */
+.hist-wrap { height: 40px; display: flex; align-items: flex-end; gap: 1px; margin-top: 4px; }
+.hist-bar { flex: 1; background: var(--acc); min-height: 1px; border-radius: 1px 1px 0 0; opacity: .6; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">◈ DITHER</span>
+  <span class="logo-sep">|</span>
+  <span class="logo-sub">image dithering studio</span>
+  <span class="logo-ver">v1.0 · runs offline</span>
+</header>
+
+<div class="workspace">
+
+  <!-- ── Controls ──────────────────────────── -->
+  <aside class="ctl">
+
+    <div>
+      <div class="sec-ttl">Algorithm</div>
+      <div class="algo-list" id="algoList">
+        <button class="algo-btn on" data-a="floyd-steinberg">
+          <span class="dot"></span>
+          <span><span class="a-name">Floyd-Steinberg</span><span class="a-tag">serpentine error diffusion</span></span>
+        </button>
+        <button class="algo-btn" data-a="atkinson">
+          <span class="dot"></span>
+          <span><span class="a-name">Atkinson</span><span class="a-tag">Apple-style, punchy contrast</span></span>
+        </button>
+        <button class="algo-btn" data-a="bayer4">
+          <span class="dot"></span>
+          <span><span class="a-name">Bayer 4×4</span><span class="a-tag">ordered crosshatch pattern</span></span>
+        </button>
+        <button class="algo-btn" data-a="bayer8">
+          <span class="dot"></span>
+          <span><span class="a-name">Bayer 8×8</span><span class="a-tag">finer ordered pattern</span></span>
+        </button>
+        <button class="algo-btn" data-a="threshold">
+          <span class="dot"></span>
+          <span><span class="a-name">Threshold</span><span class="a-tag">hard cutoff, no diffusion</span></span>
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-ttl">Palette</div>
+      <div class="sl-grp">
+        <div class="sl-hd"><span class="sl-lbl">Levels / channel</span><span class="sl-val" id="vLev">2</span></div>
+        <input type="range" id="sLev" min="2" max="16" step="1" value="2">
+      </div>
+      <div id="histWrap" class="hist-wrap"></div>
+    </div>
+
+    <div>
+      <div class="sec-ttl">Pre-Process</div>
+
+      <div class="tgl-row">
+        <span class="tgl-lbl">Grayscale</span>
+        <label class="sw"><input type="checkbox" id="tGray"><span class="sw-trk"></span><span class="sw-thb"></span></label>
+      </div>
+      <div class="tgl-row">
+        <span class="tgl-lbl">Sepia</span>
+        <label class="sw"><input type="checkbox" id="tSepia"><span class="sw-trk"></span><span class="sw-thb"></span></label>
+      </div>
+      <div class="tgl-row">
+        <span class="tgl-lbl">Invert</span>
+        <label class="sw"><input type="checkbox" id="tInvert"><span class="sw-trk"></span><span class="sw-thb"></span></label>
+      </div>
+
+      <div style="margin-top:10px">
+        <div class="sl-grp">
+          <div class="sl-hd"><span class="sl-lbl">Brightness</span><span class="sl-val" id="vBri">1.00</span></div>
+          <input type="range" id="sBri" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="sl-grp">
+          <div class="sl-hd"><span class="sl-lbl">Contrast</span><span class="sl-val" id="vCon">1.00</span></div>
+          <input type="range" id="sCon" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="sl-grp">
+          <div class="sl-hd"><span class="sl-lbl">Gamma</span><span class="sl-val" id="vGam">1.00</span></div>
+          <input type="range" id="sGam" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="sl-grp">
+          <div class="sl-hd"><span class="sl-lbl">Blur radius</span><span class="sl-val" id="vBlr">0</span></div>
+          <input type="range" id="sBlr" min="0" max="10" step="1" value="0">
+        </div>
+        <div class="sl-grp">
+          <div class="sl-hd"><span class="sl-lbl">Sharpen</span><span class="sl-val" id="vShp">0.0</span></div>
+          <input type="range" id="sShp" min="0" max="3" step="0.1" value="0">
+        </div>
+        <div class="sl-grp">
+          <div class="sl-hd"><span class="sl-lbl">Scale</span><span class="sl-val" id="vScl">1.00×</span></div>
+          <input type="range" id="sScl" min="0.1" max="2" step="0.05" value="1">
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-ttl">Export</div>
+      <div class="btn-grp">
+        <button class="btn pri" id="btnDl" disabled>↓ Download PNG</button>
+        <button class="btn" id="btnReset">Reset Settings</button>
+        <button class="btn" id="btnClear">Clear Image</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Canvas Area ──────────────────────── -->
+  <div class="cvs-area">
+
+    <div class="dz" id="dz">
+      <div class="dz-icon">[ ↓ ]</div>
+      <div class="dz-main">Drop an image here</div>
+      <div class="dz-sub">or click to browse &nbsp;·&nbsp; PNG · JPG · WebP · GIF · BMP</div>
+    </div>
+
+    <div class="sv" id="sv">
+      <img class="si" id="imgB" alt="original">
+      <img class="si" id="imgA" alt="dithered">
+      <div class="sh-wrap" id="sh">
+        <div class="sh-line"></div>
+        <div class="sh-knob">⇔</div>
+      </div>
+      <div class="sv-lbls">
+        <span class="sv-tag">original</span>
+        <span class="sv-tag">dithered</span>
+      </div>
+    </div>
+
+    <div class="stbar">
+      <span id="stInfo">No image loaded</span>
+      <span class="st-proc" id="stProc"></span>
+    </div>
+
+  </div>
+</div>
+
+<input type="file" id="fi" accept="image/*" style="display:none">
+
+<script>
+// ── Bayer matrices ────────────────────────────────────────
+const B4 = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+const B8 = [
+  [0,32,8,40,2,34,10,42],[48,16,56,24,50,18,58,26],
+  [12,44,4,36,14,46,6,38],[60,28,52,20,62,30,54,22],
+  [3,35,11,43,1,33,9,41],[51,19,59,27,49,17,57,25],
+  [15,47,7,39,13,45,5,37],[63,31,55,23,61,29,53,21]
+];
+
+// ── Quantize ──────────────────────────────────────────────
+function Q(v, lev) {
+  const step = 255 / (lev - 1);
+  return Math.min(lev - 1, Math.max(0, Math.round(Math.max(0,Math.min(255,v)) / step))) * step;
+}
+
+// ── Box blur (separable) ──────────────────────────────────
+function blur(buf, w, h, r) {
+  if (r < 1) return buf;
+  const tmp = new Float32Array(buf.length);
+  const out = new Float32Array(buf.length);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      for (let c = 0; c < 3; c++) {
+        let s = 0, n = 0;
+        for (let d = -r; d <= r; d++) { s += buf[(y*w + Math.min(w-1,Math.max(0,x+d)))*4+c]; n++; }
+        tmp[(y*w+x)*4+c] = s/n;
+      }
+      tmp[(y*w+x)*4+3] = buf[(y*w+x)*4+3];
+    }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      for (let c = 0; c < 3; c++) {
+        let s = 0, n = 0;
+        for (let d = -r; d <= r; d++) { s += tmp[(Math.min(h-1,Math.max(0,y+d))*w+x)*4+c]; n++; }
+        out[(y*w+x)*4+c] = s/n;
+      }
+      out[(y*w+x)*4+3] = tmp[(y*w+x)*4+3];
+    }
+  return out;
+}
+
+// ── Main processing pipeline ──────────────────────────────
+function process(srcData, sw, sh, pw, ph, cfg) {
+  // Resample to preview size × user scale
+  const fw = Math.max(1, Math.round(pw * cfg.scale));
+  const fh = Math.max(1, Math.round(ph * cfg.scale));
+  const oc = document.createElement('canvas');
+  oc.width = fw; oc.height = fh;
+  const ox = oc.getContext('2d');
+  const tmp = document.createElement('canvas');
+  tmp.width = sw; tmp.height = sh;
+  tmp.getContext('2d').putImageData(srcData, 0, 0);
+  ox.imageSmoothingEnabled = cfg.scale < 1;
+  ox.imageSmoothingQuality = 'high';
+  ox.drawImage(tmp, 0, 0, fw, fh);
+  const id = ox.getImageData(0, 0, fw, fh);
+  let b = new Float32Array(id.data);
+  const W = fw, H = fh;
+  const N = W * H;
+
+  // Grayscale
+  if (cfg.gray)
+    for (let i = 0; i < N; i++) {
+      const l = .299*b[i*4] + .587*b[i*4+1] + .114*b[i*4+2];
+      b[i*4] = b[i*4+1] = b[i*4+2] = l;
+    }
+
+  // Sepia
+  if (cfg.sepia)
+    for (let i = 0; i < N; i++) {
+      const r=b[i*4], g=b[i*4+1], bv=b[i*4+2];
+      b[i*4]   = Math.min(255, r*.393 + g*.769 + bv*.189);
+      b[i*4+1] = Math.min(255, r*.349 + g*.686 + bv*.168);
+      b[i*4+2] = Math.min(255, r*.272 + g*.534 + bv*.131);
+    }
+
+  // Invert
+  if (cfg.inv)
+    for (let i = 0; i < N; i++)
+      { b[i*4]=255-b[i*4]; b[i*4+1]=255-b[i*4+1]; b[i*4+2]=255-b[i*4+2]; }
+
+  // Brightness
+  if (cfg.bri !== 1)
+    for (let i = 0; i < N; i++)
+      for (let c=0;c<3;c++) b[i*4+c]=Math.min(255,Math.max(0,b[i*4+c]*cfg.bri));
+
+  // Contrast
+  if (cfg.con !== 1)
+    for (let i = 0; i < N; i++)
+      for (let c=0;c<3;c++) b[i*4+c]=Math.min(255,Math.max(0,(b[i*4+c]-128)*cfg.con+128));
+
+  // Gamma
+  if (cfg.gam !== 1) {
+    const inv = 1/cfg.gam;
+    for (let i = 0; i < N; i++)
+      for (let c=0;c<3;c++) b[i*4+c] = Math.pow(b[i*4+c]/255, inv)*255;
+  }
+
+  // Blur
+  if (cfg.blr > 0) b = blur(b, W, H, cfg.blr);
+
+  // Sharpen (unsharp mask)
+  if (cfg.shp > 0) {
+    const bl = blur(b, W, H, 1);
+    for (let i = 0; i < N; i++)
+      for (let c=0;c<3;c++)
+        b[i*4+c]=Math.min(255,Math.max(0, b[i*4+c]+(b[i*4+c]-bl[i*4+c])*cfg.shp));
+  }
+
+  // ── Dithering ─────────────────────────────────────────
+  const lev = cfg.lev;
+  const out = new Float32Array(b);
+
+  if (cfg.algo === 'threshold') {
+    for (let i=0;i<N;i++) for (let c=0;c<3;c++) out[i*4+c]=Q(out[i*4+c],lev);
+
+  } else if (cfg.algo === 'floyd-steinberg') {
+    for (let y=0;y<H;y++) {
+      const ltr = (y%2===0), xs=ltr?0:W-1, xe=ltr?W:-1, xd=ltr?1:-1;
+      for (let x=xs; x!==xe; x+=xd)
+        for (let c=0;c<3;c++) {
+          const old=out[(y*W+x)*4+c], nw=Q(old,lev);
+          out[(y*W+x)*4+c]=nw;
+          const e=old-nw;
+          const xn=x+xd, xp=x-xd;
+          if (xn>=0&&xn<W) out[(y*W+xn)*4+c]+=e*7/16;
+          if (xp>=0&&xp<W&&y+1<H) out[((y+1)*W+xp)*4+c]+=e*3/16;
+          if (y+1<H) out[((y+1)*W+x)*4+c]+=e*5/16;
+          if (xn>=0&&xn<W&&y+1<H) out[((y+1)*W+xn)*4+c]+=e/16;
+        }
+    }
+
+  } else if (cfg.algo === 'atkinson') {
+    const f=1/8;
+    for (let y=0;y<H;y++)
+      for (let x=0;x<W;x++)
+        for (let c=0;c<3;c++) {
+          const old=out[(y*W+x)*4+c], nw=Q(old,lev);
+          out[(y*W+x)*4+c]=nw;
+          const e=old-nw;
+          const sp=(px,py)=>{ if(px>=0&&px<W&&py>=0&&py<H) out[(py*W+px)*4+c]+=e*f; };
+          sp(x+1,y); sp(x+2,y);
+          sp(x-1,y+1); sp(x,y+1); sp(x+1,y+1);
+          sp(x,y+2);
+        }
+
+  } else {
+    const mat = cfg.algo==='bayer4'?B4:B8, n=mat.length, tot=n*n;
+    const step=255/(lev-1);
+    for (let y=0;y<H;y++)
+      for (let x=0;x<W;x++) {
+        const bias=(mat[y%n][x%n]+.5)/tot - .5;
+        for (let c=0;c<3;c++) out[(y*W+x)*4+c]=Q(out[(y*W+x)*4+c]+bias*step,lev);
+      }
+  }
+
+  // Write back to Uint8ClampedArray
+  const u8 = new Uint8ClampedArray(N*4);
+  for (let i=0;i<N*4;i++) u8[i]=Math.round(Math.min(255,Math.max(0,out[i])));
+  return { imageData: new ImageData(u8,W,H), width: W, height: H };
+}
+
+// ── State ─────────────────────────────────────────────────
+let srcData=null, srcW=0, srcH=0, splitPct=.5, procTimer=null;
+const MAX_PX = 760;
+
+function previewSize() {
+  const s=Math.min(1, MAX_PX/Math.max(srcW,srcH));
+  return { pw: Math.round(srcW*s), ph: Math.round(srcH*s) };
+}
+
+function getCfg() {
+  return {
+    algo:  document.querySelector('.algo-btn.on').dataset.a,
+    lev:   parseInt(sLev.value),
+    gray:  tGray.checked, sepia: tSepia.checked, inv: tInvert.checked,
+    bri:   parseFloat(sBri.value), con: parseFloat(sCon.value),
+    gam:   parseFloat(sGam.value), blr: parseInt(sBlr.value),
+    shp:   parseFloat(sShp.value), scale: parseFloat(sScl.value),
+  };
+}
+
+// ── Histogram ─────────────────────────────────────────────
+function drawHistogram(imgData) {
+  const bins = new Array(16).fill(0);
+  const d = imgData.data;
+  for (let i=0;i<d.length;i+=4) {
+    const l = Math.round((.299*d[i]+.587*d[i+1]+.114*d[i+2])/255*15);
+    bins[l]++;
+  }
+  const mx = Math.max(...bins, 1);
+  histWrap.innerHTML = bins.map(v=>
+    `<div class="hist-bar" style="height:${Math.round(v/mx*38)}px"></div>`
+  ).join('');
+}
+
+// ── Render ────────────────────────────────────────────────
+function imgToDataURL(imgData, w, h) {
+  const oc=document.createElement('canvas'); oc.width=w; oc.height=h;
+  oc.getContext('2d').putImageData(imgData,0,0); return oc.toDataURL();
+}
+
+function scheduleProcess() {
+  if (!srcData) return;
+  clearTimeout(procTimer);
+  procTimer = setTimeout(runProcess, 90);
+}
+
+function runProcess() {
+  if (!srcData) return;
+  stProc.textContent='processing…';
+  requestAnimationFrame(() => {
+    try {
+      const cfg=getCfg();
+      const {pw,ph}=previewSize();
+      const r=process(srcData,srcW,srcH,pw,ph,cfg);
+      imgA.src=imgToDataURL(r.imageData,r.width,r.height);
+      drawHistogram(r.imageData);
+      stProc.textContent=`${cfg.algo} · ${cfg.lev} levels · ${r.width}×${r.height}`;
+    } catch(e) { stProc.textContent='error: '+e.message; console.error(e); }
+  });
+}
+
+// ── Load image ────────────────────────────────────────────
+function loadFile(file) {
+  if (!file||!file.type.startsWith('image/')) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const oc=document.createElement('canvas');
+      oc.width=img.naturalWidth; oc.height=img.naturalHeight;
+      const ctx=oc.getContext('2d'); ctx.drawImage(img,0,0);
+      srcData=ctx.getImageData(0,0,oc.width,oc.height);
+      srcW=oc.width; srcH=oc.height;
+      // Show original
+      const {pw,ph}=previewSize();
+      const rc=document.createElement('canvas'); rc.width=pw; rc.height=ph;
+      rc.getContext('2d').drawImage(oc,0,0,pw,ph);
+      imgB.src=rc.toDataURL();
+      // Switch view
+      dz.style.display='none'; sv.style.display='block';
+      btnDl.disabled=false;
+      stInfo.textContent=`${file.name} · ${srcW}×${srcH}`;
+      scheduleProcess();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Split handle drag ─────────────────────────────────────
+function setSplit(pct) {
+  splitPct=Math.max(.02,Math.min(.98,pct));
+  const p=(splitPct*100).toFixed(1);
+  imgA.style.clipPath=`inset(0 0 0 ${p}%)`;
+  sh.style.left=p+'%';
+}
+
+let dragging=false;
+sh.addEventListener('mousedown', e=>{dragging=true;e.preventDefault();});
+document.addEventListener('mousemove', e=>{
+  if (!dragging) return;
+  const rect=sv.getBoundingClientRect();
+  setSplit((e.clientX-rect.left)/rect.width);
+});
+document.addEventListener('mouseup',()=>dragging=false);
+sh.addEventListener('touchstart',e=>{dragging=true;e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',e=>{
+  if (!dragging) return;
+  const rect=sv.getBoundingClientRect();
+  setSplit((e.touches[0].clientX-rect.left)/rect.width);},{passive:true});
+document.addEventListener('touchend',()=>dragging=false);
+
+// ── Drop zone ─────────────────────────────────────────────
+dz.addEventListener('click',()=>fi.click());
+fi.addEventListener('change',e=>loadFile(e.target.files[0]));
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');loadFile(e.dataTransfer.files[0]);});
+sv.addEventListener('dragover',e=>e.preventDefault());
+sv.addEventListener('drop',e=>{e.preventDefault();loadFile(e.dataTransfer.files[0]);});
+
+// ── Algorithm buttons ─────────────────────────────────────
+algoList.addEventListener('click',e=>{
+  const btn=e.target.closest('.algo-btn'); if (!btn) return;
+  document.querySelectorAll('.algo-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); scheduleProcess();
+});
+
+// ── Sliders ───────────────────────────────────────────────
+const sliders=[
+  ['sLev','vLev',v=>v,true],
+  ['sBri','vBri',v=>parseFloat(v).toFixed(2),false],
+  ['sCon','vCon',v=>parseFloat(v).toFixed(2),false],
+  ['sGam','vGam',v=>parseFloat(v).toFixed(2),false],
+  ['sBlr','vBlr',v=>v,true],
+  ['sShp','vShp',v=>parseFloat(v).toFixed(1),false],
+  ['sScl','vScl',v=>parseFloat(v).toFixed(2)+'×',false],
+];
+sliders.forEach(([sid,vid,fmt])=>{
+  const el=document.getElementById(sid), vl=document.getElementById(vid);
+  el.addEventListener('input',()=>{vl.textContent=fmt(el.value); scheduleProcess();});
+});
+['tGray','tSepia','tInvert'].forEach(id=>
+  document.getElementById(id).addEventListener('change',scheduleProcess));
+
+// ── Buttons ───────────────────────────────────────────────
+btnDl.addEventListener('click',()=>{
+  if (!srcData) return;
+  stProc.textContent='rendering full resolution…';
+  setTimeout(()=>{
+    try {
+      const cfg=getCfg();
+      const r=process(srcData,srcW,srcH,srcW,srcH,cfg);
+      const a=document.createElement('a');
+      a.download=`dithered_${cfg.algo}_${cfg.lev}lv.png`;
+      a.href=imgToDataURL(r.imageData,r.width,r.height); a.click();
+      stProc.textContent=`downloaded · ${r.width}×${r.height} · ${cfg.algo}`;
+    } catch(e){ stProc.textContent='export error: '+e.message; }
+  },20);
+});
+
+btnReset.addEventListener('click',()=>{
+  [['sLev','vLev','2',v=>v],['sBri','vBri','1',v=>parseFloat(v).toFixed(2)],
+   ['sCon','vCon','1',v=>parseFloat(v).toFixed(2)],['sGam','vGam','1',v=>parseFloat(v).toFixed(2)],
+   ['sBlr','vBlr','0',v=>v],['sShp','vShp','0',v=>parseFloat(v).toFixed(1)],
+   ['sScl','vScl','1',v=>parseFloat(v).toFixed(2)+'×']
+  ].forEach(([sid,vid,def,fmt])=>{
+    const el=document.getElementById(sid); el.value=def;
+    document.getElementById(vid).textContent=fmt(def);
+  });
+  ['tGray','tSepia','tInvert'].forEach(id=>document.getElementById(id).checked=false);
+  document.querySelectorAll('.algo-btn').forEach((b,i)=>b.classList.toggle('on',i===0));
+  scheduleProcess();
+});
+
+btnClear.addEventListener('click',()=>{
+  srcData=null; dz.style.display=''; sv.style.display='none';
+  btnDl.disabled=true; stInfo.textContent='No image loaded'; stProc.textContent='';
+  fi.value=''; histWrap.innerHTML='';
+});
+
+// ── Init ──────────────────────────────────────────────────
+setSplit(.5);
+</script>
+</body>
+</html>
